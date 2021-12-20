@@ -86,8 +86,10 @@ class MLP(torch.nn.Module):
         out = (observations - self.in_shift) / (self.in_scale + 1e-6)
         for i in range(len(self.fc_layers)-1):
             out = self.fc_layers[i](out)
-            out = self.nonlinearity(out)
+            out = self.nonlinearity(out) # DROPOUT?
         out = self.fc_layers[-1](out) * self.out_scale + self.out_shift
+        ### MANUAL CLIP !!!!!
+        out = torch.max(torch.min(out, observations[:,:8]+0.1), observations[:,:8]-0.1)
         return out
 
 
@@ -120,7 +122,7 @@ class MLP(torch.nn.Module):
         self.log_std_val = np.clip(self.log_std_val, self.min_log_std_val, self.max_log_std_val)
         self.trainable_params = list(self.parameters())
 
-    def set_transformations(self, in_shift=None, in_scale=None, 
+    def set_transformations(self, in_shift=None, in_scale=None,
                             out_shift=None, out_scale=None, *args, **kwargs):
         in_shift = self.in_shift if in_shift is None else tensorize(in_shift)
         in_scale = self.in_scale if in_scale is None else tensorize(in_scale)
@@ -128,6 +130,10 @@ class MLP(torch.nn.Module):
         out_scale = self.out_scale if out_scale is None else tensorize(out_scale)
         self.in_shift, self.in_scale = in_shift.to(self.device), in_scale.to(self.device)
         self.out_shift, self.out_scale = out_shift.to(self.device), out_scale.to(self.device)
+
+        print("Set transformations")
+        print(f" in shift\n  {in_shift.cpu().numpy()}\n in scale\n  {in_scale.cpu().numpy()}")
+        print(f" out shift\n   {out_shift.cpu().numpy()}\n out scale\n  {out_scale.cpu().numpy()}")
 
 
     # Main functions

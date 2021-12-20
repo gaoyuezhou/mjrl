@@ -1,0 +1,47 @@
+{
+
+# general inputs
+
+'env_name'      :   '',
+'act_repeat'    :   1, # ?
+'seed'          :   123,
+'num_iter'      :   10000,
+'eval_rollouts' :   0, # DON't EVAL --------------------------------------------
+'num_models'    :   4,
+'save_freq'     :   25,
+'device'        :   'cuda',
+'learn_reward'  :   False,
+'data_file'     :   '/home/franka/dev/franka_learning/morel_12-06-k-reach-tag-rewritemarker.pkl',
+'reward_file'   :   'rewards/reaching.py',
+'model_file'    :   'franka-reaching-4.pickle',
+'bc_init'       :   True,
+'bc_init_epoch' :   100,
+'pessimism_coef':   0.05,
+'truncate_reward' : 0.0,
+'exp_notes'     :   'Example to illustrate MOReL.',
+
+# dynamics learning
+
+'hidden_size'   :   (128, 128),
+'activation'    :   'relu',
+'fit_lr'        :   5e-4,
+'fit_wd'        :   0.0,
+'fit_mb_size'   :   1000,
+'fit_epochs'    :   200,
+'refresh_fit'   :   False,
+'max_steps'     :   1e8,
+
+# NPG params
+
+'policy_size'   :   (128, 128),
+'step_size'     :   0.02, # ?????????
+'init_log_std'  :   -5,
+'min_log_std'   :   -10.0,
+'gamma'         :   0.999,
+'gae_lambda'    :   0.97,
+'update_paths'  :   20,
+'start_state'   :   'init',
+'horizon'       :   500,
+'npg_hp'        :   dict(FIM_invert_args={'iters': 25, 'damping': 1e-3}),
+
+}

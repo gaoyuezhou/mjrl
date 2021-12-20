@@ -22,6 +22,7 @@ class BC:
                  optimizer = None,
                  loss_type = 'MSE',  # can be 'MLE' or 'MSE'
                  save_logs = True,
+                 logger = None,
                  set_transforms = False,
                  *args, **kwargs,
                  ):
@@ -39,7 +40,7 @@ class BC:
         if set_transforms:
             in_shift, in_scale, out_shift, out_scale = self.compute_transformations()
             self.set_transformations(in_shift, in_scale, out_shift, out_scale)
-            self.set_variance_with_data(out_scale)
+            #self.set_variance_with_data(out_scale)
 
         # construct optimizer
         self.optimizer = torch.optim.Adam(self.policy.trainable_params, lr=lr) if optimizer is None else optimizer
@@ -50,7 +51,7 @@ class BC:
 
         # make logger
         if self.save_logs:
-            self.logger = DataLog()
+            self.logger = logger or DataLog()
 
     def compute_transformations(self):
         # get transformations
@@ -116,6 +117,7 @@ class BC:
         if self.save_logs:
             loss_val = self.loss(data, idx=range(num_samples)).to('cpu').data.numpy().ravel()[0]
             self.logger.log_kv('loss_before', loss_val)
+            print('BC loss before', loss_val)
 
         # train loop
         for ep in config_tqdm(range(self.epochs), suppress_fit_tqdm):
@@ -134,6 +136,7 @@ class BC:
             loss_val = self.loss(data, idx=range(num_samples)).to('cpu').data.numpy().ravel()[0]
             self.logger.log_kv('loss_after', loss_val)
             self.logger.log_kv('time', (timer.time()-ts))
+            print('BC val loss', loss_val)
 
     def train(self, **kwargs):
         observations = np.concatenate([path["observations"] for path in self.expert_paths])

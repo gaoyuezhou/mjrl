@@ -14,11 +14,11 @@ To run MOReL with the [d4rl](https://sites.google.com/view/d4rl/home) domains, f
 python prep_d4rl_dataset.py --env_name hopper-medium-v0 --include ../model_based_npg/utils/reward_functions/gym_hopper.py --output datasets/hopper-medium-v0.pickle
 ```
 
-- **Learning the Dynamics Model Ensemble :** Once we have the dataset, we can learn a neural network dynamics model by executing the below command. 
+- **Learning the Dynamics Model Ensemble :** Once we have the dataset, we can learn a neural network dynamics model by executing the below command.
 ```
 CUDA_VISIBLE_DEVICES=0 python learn_model.py --config configs/d4rl_hopper_medium.txt --output hopper-medium-v0-models.pickle
 ```
- 
+
 - **Run MOReL :** Finally, once the ensemble of models have been learned (see previous step), we can turn to learning a policy using the MOReL algorithm. Before doing so, ensure that the path to the learned dynamics model is correctly specified in the config file. After ensuring this, execute the below command:
 ```
 CUDA_VISIBLE_DEVICES=0 python run_morel.py --config configs/d4rl_hopper_medium.txt --output hopper-medium-v0-example
@@ -48,11 +48,11 @@ The first set of expeirments in MOReL follows the same dataset protocol as the [
 python collect_dataset.py --env_name Hopper-v3 --policy logging_policy/hopper_v3.pickle --output datasets/hopper_v3_dataset.pickle --size 10000 --act_repeat 2 --include "../model_based_npg/utils/reward_functions/gym_hopper.py"
 ```
 
-- **Learning the Dynamics Model Ensemble :** Once we have the dataset, we can learn a neural network dynamics model by executing the below command. 
+- **Learning the Dynamics Model Ensemble :** Once we have the dataset, we can learn a neural network dynamics model by executing the below command.
 ```
 CUDA_VISIBLE_DEVICES=0 python learn_model.py --config configs/hopper_v3_morel.txt --output hopper-v3-models.pickle
 ```
- 
+
 - **Run MOReL :** Finally, once the ensemble of models have been learned (see previous step), we can turn to learning a policy using the MOReL algorithm. Before doing so, ensure that the path to the learned dynamics model is correctly specified in the config file. After ensuring this, execute the below command:
 ```
 CUDA_VISIBLE_DEVICES=0 python run_morel.py --config configs/hopper_v3_morel.txt --output Hopper-v3-morel-example

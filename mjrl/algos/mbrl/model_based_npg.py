@@ -112,6 +112,10 @@ class ModelBasedNPG(NPG):
             rollouts = policy_rollout(num_traj=N, env=env, policy=self.policy,
                                       learned_model=model, eval_mode=False, horizon=horizon,
                                       init_state=init_states, seed=None)
+
+            #print(rollouts['observations'][0][0:2])
+            #print(rollouts['actions'][0][0])
+
             # use learned reward function if available
             if model.learn_reward:
                 model.compute_path_rewards(rollouts)
@@ -126,18 +130,23 @@ class ModelBasedNPG(NPG):
                     path[key] = rollouts[key][i, ...]
                 paths.append(path)
 
+        self.logger.log_kv('traj_len_1col', np.average([len(p['rewards']) for p in paths]))
+
         # NOTE: If tasks have termination condition, we will assume that the env has
         # a function that can terminate paths appropriately.
         # Otherwise, termination is not considered.
 
-        if callable(termination_function): 
+        if callable(termination_function):
             paths = termination_function(paths)
         else:
             # mark unterminated
             for path in paths: path['terminated'] = False
 
+        self.logger.log_kv('traj_len_2ter', np.average([len(p['rewards']) for p in paths]))
+
         # remove paths that are too short
-        paths = [path for path in paths if path['observations'].shape[0] >= 5]
+        TOO_SHORT = 5 # was 5
+        paths = [path for path in paths if path['observations'].shape[0] >= TOO_SHORT]
 
         # additional truncation based on error in the ensembles
         if truncate_lim is not None and len(self.learned_model) > 1:
@@ -157,12 +166,14 @@ class ModelBasedNPG(NPG):
                 violations = np.where(pred_err > truncate_lim)[0]
                 truncated = (not len(violations) == 0)
                 T = violations[0] + 1 if truncated else path['observations'].shape[0]
-                T = max(4, T)   # we don't want corner cases of very short truncation
+                T = max(1, T)   # we don't want corner cases of very short truncation
                 path["observations"] = path["observations"][:T]
                 path["actions"] = path["actions"][:T]
                 path["rewards"] = path["rewards"][:T]
                 if truncated: path["rewards"][-1] += truncate_reward
                 path["terminated"] = False if T == path['observations'].shape[0] else True
+
+        self.logger.log_kv('traj_len_3cut', np.average([len(p['rewards']) for p in paths]))
 
         if self.save_logs:
             self.logger.log_kv('time_sampling', timer.time() - ts)
@@ -179,7 +190,9 @@ class ModelBasedNPG(NPG):
         # log number of samples
         if self.save_logs:
             num_samples = np.sum([p["rewards"].shape[0] for p in paths])
-            self.logger.log_kv('num_samples', num_samples)
+            avg_len = np.average([p["rewards"].shape[0] for p in paths])
+            self.logger.log_kv('num_steps', num_samples)
+            self.logger.log_kv('traj_len', avg_len)
         # fit baseline
         if self.save_logs:
             ts = timer.time()

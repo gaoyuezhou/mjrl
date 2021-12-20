@@ -85,7 +85,10 @@ def buffer_size(paths_list):
 np.random.seed(SEED)
 torch.random.manual_seed(SEED)
 
-if ENV_NAME.split('_')[0] == 'dmc':
+if ENV_NAME == '':
+    from franka import FrankaEnv
+    e = FrankaEnv()
+elif ENV_NAME.split('_')[0] == 'dmc':
     # import only if necessary (not part of package requirements)
     import dmc2gym
     backend, domain, task = ENV_NAME.split('_')
@@ -118,9 +121,10 @@ if 'obs_mask' in globals(): e.obs_mask = obs_mask
 if job_data['model_file'] is not None:
     model_trained = True
     models = pickle.load(open(job_data['model_file'], 'rb'))
+    print('Loaded dynamics model')
 else:
     model_trained = False
-    models = [WorldModel(state_dim=e.observation_dim, act_dim=e.action_dim, seed=SEED+i, 
+    models = [WorldModel(state_dim=e.observation_dim, act_dim=e.action_dim, seed=SEED+i,
                      **job_data) for i in range(job_data['num_models'])]
 
 # Construct policy and set exploration level correctly for NPG
@@ -137,13 +141,18 @@ if 'init_policy' in job_data.keys():
         policy.min_log_std[:] = tensor_utils.tensorize(min_log_std)
         policy.set_param_values(policy.get_param_values())
 else:
-    policy = MLP(e.spec, seed=SEED, hidden_sizes=job_data['policy_size'], 
-                    init_log_std=job_data['init_log_std'], min_log_std=job_data['min_log_std'])
+    print(f'Policy obs dim {e.observation_dim} act dim {e.action_dim}')
+    policy = MLP(e.spec, seed=SEED, hidden_sizes=job_data['policy_size'],
+                    init_log_std=job_data['init_log_std'], min_log_std=job_data['min_log_std'],
+                    observation_dim=e.observation_dim,
+                       action_dim=e.action_dim)
 
 baseline = MLPBaseline(e.spec, reg_coef=1e-3, batch_size=256, epochs=1,  learn_rate=1e-3,
-                       device=job_data['device'])               
+                       device=job_data['device'],
+                       observation_dim=e.observation_dim,
+                       action_dim=e.action_dim)
 agent = ModelBasedNPG(learned_model=models, env=e, policy=policy, baseline=baseline, seed=SEED,
-                      normalized_step_size=job_data['step_size'], save_logs=True, 
+                      normalized_step_size=job_data['step_size'], save_logs=True,
                       reward_function=reward_function, termination_function=termination_function,
                       **job_data['npg_hp'])
 
@@ -204,6 +213,7 @@ for idx_1, model_1 in enumerate(models):
             pred_2 = model_2.predict(s, a)
             disagreement = np.linalg.norm((pred_1-pred_2), axis=-1)
             delta = np.maximum(delta, disagreement)
+print(f"Disagreement on given dataset: {delta}")
 
 if 'pessimism_coef' in job_data.keys():
     if job_data['pessimism_coef'] is None or job_data['pessimism_coef'] == 0.0:
@@ -227,10 +237,14 @@ with open(EXP_FILE, 'w') as f:
 # Behavior Cloning Initialization
 # ===============================================================================
 if 'bc_init' in job_data.keys():
-    if job_data['bc_init']:
+    if isinstance(job_data['bc_init'], str):
+        policy = pickle.load(open(job_data['bc_init'], 'rb'))
+    elif job_data['bc_init']:
         from mjrl.algos.behavior_cloning import BC
         policy.to(job_data['device'])
-        bc_agent = BC(paths, policy, epochs=5, batch_size=256, loss_type='MSE')
+        bc_agent = BC(paths, policy,
+            epochs=80, batch_size=128, loss_type='MSE', save_logs=True, logger=logger,
+            set_transforms=True)
         bc_agent.train()
 
 # ===============================================================================
@@ -261,7 +275,7 @@ for outer_iter in range(job_data['num_iter']):
     train_stats = agent.train_step(N=len(init_states), init_states=init_states, **job_data)
     logger.log_kv('train_score', train_stats[0])
     agent.policy.to('cpu')
-    
+
     # evaluate true policy performance
     if job_data['eval_rollouts'] > 0:
         print("Performing validation rollouts ... ")
@@ -297,18 +311,19 @@ for outer_iter in range(job_data['num_iter']):
         # convert to CPU before pickling
         agent.to('cpu')
         # make observation mask part of policy for easy deployment in environment
-        old_in_scale = policy.in_scale
-        for pi in [policy, best_policy]: pi.set_transformations(in_scale = 1.0 / e.obs_mask)
+        #old_in_scale = policy.in_scale
+        #for pi in [policy, best_policy]: pi.set_transformations(in_scale = 1.0 / e.obs_mask)
         pickle.dump(agent, open(OUT_DIR + '/iterations/agent_' + str(outer_iter) + '.pickle', 'wb'))
         pickle.dump(policy, open(OUT_DIR + '/iterations/policy_' + str(outer_iter) + '.pickle', 'wb'))
         pickle.dump(best_policy, open(OUT_DIR + '/iterations/best_policy.pickle', 'wb'))
+
         agent.to(job_data['device'])
-        for pi in [policy, best_policy]: pi.set_transformations(in_scale = old_in_scale)
+        #for pi in [policy, best_policy]: pi.set_transformations(in_scale = old_in_scale)
         make_train_plots(log=logger.log, keys=['rollout_score', 'eval_score', 'rollout_metric', 'eval_metric'],
                          x_scale=float(job_data['act_repeat']), y_scale=1.0, save_loc=OUT_DIR+'/logs/')
 
 # final save
 pickle.dump(agent, open(OUT_DIR + '/iterations/agent_final.pickle', 'wb'))
-policy.set_transformations(in_scale = 1.0 / e.obs_mask)
+#policy.set_transformations(in_scale = 1.0 / e.obs_mask)
 pickle.dump(policy, open(OUT_DIR + '/iterations/policy_final.pickle', 'wb'))
 

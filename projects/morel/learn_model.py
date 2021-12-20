@@ -34,13 +34,15 @@ from mjrl.algos.mbrl.sampling import sample_paths, evaluate_policy
 # ===============================================================================
 
 parser = argparse.ArgumentParser(description='Model accelerated policy optimization.')
-parser.add_argument('--output', '-o', type=str, required=True, help='location to store the model pickle file')
+parser.add_argument('--output', '-o', type=str, required=False, help='location to store the model pickle file')
 parser.add_argument('--config', '-c', type=str, required=True, help='path to config file with exp params')
 parser.add_argument('--include', '-i', type=str, required=False, help='package to import')
 args = parser.parse_args()
 with open(args.config, 'r') as f:
     job_data = eval(f.read())
 if args.include: exec("import "+args.include)
+
+output_fn = args.output or job_data['model_file']
 
 assert 'data_file' in job_data.keys()
 ENV_NAME = job_data['env_name']
@@ -51,7 +53,10 @@ if 'act_repeat' not in job_data.keys(): job_data['act_repeat'] = 1
 # ===============================================================================
 # Construct environment and model
 # ===============================================================================
-if ENV_NAME.split('_')[0] == 'dmc':
+if ENV_NAME == '':
+    from franka import FrankaEnv
+    e = FrankaEnv()
+elif ENV_NAME.split('_')[0] == 'dmc':
     # import only if necessary (not part of package requirements)
     import dmc2gym
     backend, domain, task = ENV_NAME.split('_')
@@ -61,7 +66,7 @@ else:
     e = GymEnv(ENV_NAME, act_repeat=job_data['act_repeat'])
     e.set_seed(SEED)
 
-models = [WorldModel(state_dim=e.observation_dim, act_dim=e.action_dim, seed=SEED+i, 
+models = [WorldModel(state_dim=e.observation_dim, act_dim=e.action_dim, seed=SEED+i,
                     **job_data) for i in range(job_data['num_models'])]
 
 # ===============================================================================
@@ -78,10 +83,15 @@ sp = np.concatenate([p['observations'][1:] for p in paths])
 r = np.concatenate([p['rewards'][:-1] for p in paths])
 rollout_score = np.mean([np.sum(p['rewards']) for p in paths])
 num_samples = np.sum([p['rewards'].shape[0] for p in paths])
+
+print('Observation shape', np.asarray(paths[0]['observations'][0]).shape)
+print('Action shape', np.asarray(paths[0]['actions'][0]).shape)
+
 for i, model in enumerate(models):
     dynamics_loss = model.fit_dynamics(s, a, sp, **job_data)
     loss_general = model.compute_loss(s, a, sp) # generalization error
+    print(loss_general)
     if job_data['learn_reward']:
         reward_loss = model.fit_reward(s, a, r.reshape(-1, 1), **job_data)
 
-pickle.dump(models, open(args.output, 'wb'))
+pickle.dump(models, open(output_fn, 'wb'))

@@ -29,7 +29,7 @@ def policy_rollout(
         a_max=None,
         large_value=float(1e2),
         ):
-    
+
     # Only CPU rollouts are currently supported.
     # TODO(Aravind) : Extend GPU support
 
@@ -50,6 +50,7 @@ def policy_rollout(
 
     # get initial states
     if init_state is None:
+        print("Random gen init states")
         st = np.array([env.reset() for _ in range(num_traj)])
         st = torch.from_numpy(st).float()
     elif type(init_state) == np.ndarray:
@@ -286,7 +287,7 @@ def evaluate_policy(e, policy, learned_model, noise_level=0.0,
     return paths
 
 
-def enforce_tensor_bounds(torch_tensor, min_val=None, max_val=None, 
+def enforce_tensor_bounds(torch_tensor, min_val=None, max_val=None,
                           large_value=float(1e4), device=None):
     """
         Clamp the torch_tensor to Box[min_val, max_val]
@@ -301,17 +302,17 @@ def enforce_tensor_bounds(torch_tensor, min_val=None, max_val=None,
 
     assert type(min_val) == float or type(min_val) == torch.Tensor
     assert type(max_val) == float or type(max_val) == torch.Tensor
-    
+
     if type(min_val) == torch.Tensor:
         if len(min_val.shape) > 0: assert min_val.shape[-1] == torch_tensor.shape[-1]
     else:
         min_val = torch.tensor(min_val)
-    
+
     if type(max_val) == torch.Tensor:
         if len(max_val.shape) > 0: assert max_val.shape[-1] == torch_tensor.shape[-1]
     else:
         max_val = torch.tensor(max_val)
-    
+
     min_val = min_val.to(device)
     max_val = max_val.to(device)
 
