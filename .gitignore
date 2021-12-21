@@ -105,3 +105,6 @@ ENV/
 
 # Mac OSX files
 *.DS_Store
+
+projects/morel/franka_*
+*.pickle

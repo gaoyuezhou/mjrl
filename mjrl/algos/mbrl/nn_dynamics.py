@@ -14,6 +14,8 @@ class WorldModel:
                  device='cpu',
                  activation='relu',
                  residual=True,
+                 dropout=0.,
+                 noise=0.,
                  *args,
                  **kwargs,):
 
@@ -21,7 +23,7 @@ class WorldModel:
         self.device, self.learn_reward = device, learn_reward
         if self.device == 'gpu' : self.device = 'cuda'
         # construct the dynamics model
-        self.dynamics_net = DynamicsNet(state_dim, act_dim, hidden_size, residual=residual, seed=seed).to(self.device)
+        self.dynamics_net = DynamicsNet(state_dim, act_dim, hidden_size, residual=residual, seed=seed, dropout=dropout).to(self.device)
         self.dynamics_net.set_transformations()  # in case device is different from default, it will set transforms correctly
         if activation == 'tanh' : self.dynamics_net.nonlinearity = torch.tanh
         self.dynamics_opt = torch.optim.Adam(self.dynamics_net.parameters(), lr=fit_lr, weight_decay=fit_wd)
@@ -29,13 +31,16 @@ class WorldModel:
         # construct the reward model if necessary
         if self.learn_reward:
             # small network for reward is sufficient if we augment the inputs with next state predictions
-            self.reward_net = RewardNet(state_dim, act_dim, hidden_size=(100, 100), seed=seed).to(self.device)
+            self.reward_net = RewardNet(state_dim, act_dim, hidden_size=(100, 100), seed=seed, dropout=dropout).to(self.device)
             self.reward_net.set_transformations()  # in case device is different from default, it will set transforms correctly
             if activation == 'tanh' : self.reward_net.nonlinearity = torch.tanh
             self.reward_opt = torch.optim.Adam(self.reward_net.parameters(), lr=fit_lr, weight_decay=fit_wd)
             self.reward_loss = torch.nn.MSELoss()
         else:
             self.reward_net, self.reward_opt, self.reward_loss = None, None, None
+
+        self.noise = noise
+        print(f"World model initialized, dropout = {dropout}, state noise = {noise}")
 
     def to(self, device):
         self.dynamics_net.to(device)
@@ -84,8 +89,8 @@ class WorldModel:
         loss = self.dynamics_loss(sp, s_next)
         return loss.to('cpu').data.numpy()
 
-    def fit_dynamics(self, s, a, sp, fit_mb_size, fit_epochs, max_steps=1e4, 
-                     set_transformations=True, *args, **kwargs):
+    def fit_dynamics(self, s, a, sp, fit_mb_size, fit_epochs, max_steps=1e4,
+                     set_transformations=True, noise=0, *args, **kwargs):
         # move data to correct devices
         assert type(s) == type(a) == type(sp)
         assert s.shape[0] == a.shape[0] == sp.shape[0]
@@ -94,7 +99,7 @@ class WorldModel:
             a = torch.from_numpy(a).float()
             sp = torch.from_numpy(sp).float()
         s = s.to(self.device); a = a.to(self.device); sp = sp.to(self.device)
-       
+
         # set network transformations
         if set_transformations:
             s_shift, a_shift = torch.mean(s, dim=0), torch.mean(a, dim=0)
@@ -104,18 +109,18 @@ class WorldModel:
             self.dynamics_net.set_transformations(s_shift, s_scale, a_shift, a_scale, out_shift, out_scale)
 
         # prepare dataf for learning
-        if self.dynamics_net.residual:  
+        if self.dynamics_net.residual:
             X = (s, a) ; Y = (sp - s - out_shift) / (out_scale + 1e-8)
         else:
             X = (s, a) ; Y = (sp - out_shift) / (out_scale + 1e-8)
         # disable output transformations to learn in the transformed space
         self.dynamics_net._apply_out_transforms = False
         return_vals =  fit_model(self.dynamics_net, X, Y, self.dynamics_opt, self.dynamics_loss,
-                                 fit_mb_size, fit_epochs, max_steps=max_steps)
+                                 fit_mb_size, fit_epochs, max_steps=max_steps, noise=self.noise)
         self.dynamics_net._apply_out_transforms = True
         return return_vals
 
-    def fit_reward(self, s, a, r, fit_mb_size, fit_epochs, max_steps=1e4, 
+    def fit_reward(self, s, a, r, fit_mb_size, fit_epochs, max_steps=1e4,
                    set_transformations=True, *args, **kwargs):
         if not self.learn_reward:
             print("Reward model was not initialized to be learnable. Use the reward function from env.")
@@ -130,7 +135,7 @@ class WorldModel:
             a = torch.from_numpy(a).float()
             r = torch.from_numpy(r).float()
         s = s.to(self.device); a = a.to(self.device); r = r.to(self.device)
-       
+
         # set network transformations
         if set_transformations:
             s_shift, a_shift = torch.mean(s, dim=0), torch.mean(a, dim=0)
@@ -145,13 +150,13 @@ class WorldModel:
         # call the generic fit function
         X = (s, a, sp) ; Y = r
         return fit_model(self.reward_net, X, Y, self.reward_opt, self.reward_loss,
-                         fit_mb_size, fit_epochs, max_steps=max_steps)
+                         fit_mb_size, fit_epochs, max_steps=max_steps, noise=self.noise)
 
     def compute_path_rewards(self, paths):
         # paths has two keys: observations and actions
         # paths["observations"] : (num_traj, horizon, obs_dim)
         # paths["rewards"] should have shape (num_traj, horizon)
-        if not self.learn_reward: 
+        if not self.learn_reward:
             print("Reward model is not learned. Use the reward function from env.")
             return None
         s, a = paths['observations'], paths['actions']
@@ -176,6 +181,7 @@ class DynamicsNet(nn.Module):
                  residual = True,
                  seed=123,
                  use_mask = True,
+                 dropout=0.1,
                  ):
         super(DynamicsNet, self).__init__()
 
@@ -190,6 +196,7 @@ class DynamicsNet(nn.Module):
         self.residual, self.use_mask = residual, use_mask
         self._apply_out_transforms = True
         self.set_transformations(s_shift, s_scale, a_shift, a_scale, out_shift, out_scale)
+        self.dropout = nn.Dropout(p=dropout)
 
     def set_transformations(self, s_shift=None, s_scale=None,
                             a_shift=None, a_scale=None,
@@ -238,6 +245,7 @@ class DynamicsNet(nn.Module):
         for i in range(len(self.fc_layers)-1):
             out = self.fc_layers[i](out)
             out = self.nonlinearity(out)
+            out = self.dropout(out)
         out = self.fc_layers[-1](out)
         if self._apply_out_transforms:
             out = out * (self.out_scale + 1e-8) + self.out_shift
@@ -261,13 +269,14 @@ class DynamicsNet(nn.Module):
 
 
 class RewardNet(nn.Module):
-    def __init__(self, state_dim, act_dim, 
+    def __init__(self, state_dim, act_dim,
                  hidden_size=(64,64),
                  s_shift = None,
                  s_scale = None,
                  a_shift = None,
                  a_scale = None,
                  seed=123,
+                 dropout = 0.1,
                  ):
         super(RewardNet, self).__init__()
         torch.manual_seed(seed)
@@ -278,6 +287,7 @@ class RewardNet(nn.Module):
                                         for i in range(len(self.layer_sizes)-1)])
         self.nonlinearity = torch.relu
         self.set_transformations(s_shift, s_scale, a_shift, a_scale)
+        self.dropout = nn.Dropout(p=dropout)
 
     def set_transformations(self, s_shift=None, s_scale=None,
                             a_shift=None, a_scale=None,
@@ -287,7 +297,7 @@ class RewardNet(nn.Module):
             self.s_shift, self.s_scale       = torch.zeros(self.state_dim), torch.ones(self.state_dim)
             self.a_shift, self.a_scale       = torch.zeros(self.act_dim), torch.ones(self.act_dim)
             self.sp_shift, self.sp_scale     = torch.zeros(self.state_dim), torch.ones(self.state_dim)
-            self.out_shift, self.out_scale   = 0.0, 1.0 
+            self.out_shift, self.out_scale   = 0.0, 1.0
         elif type(s_shift) == torch.Tensor:
             self.s_shift, self.s_scale       = s_shift, s_scale
             self.a_shift, self.a_scale       = a_shift, a_scale
@@ -324,6 +334,7 @@ class RewardNet(nn.Module):
         for i in range(len(self.fc_layers)-1):
             out = self.fc_layers[i](out)
             out = self.nonlinearity(out)
+            out = self.dropout(out)
         out = self.fc_layers[-1](out)
         out = out * (self.out_scale + 1e-8) + self.out_shift
         return out
@@ -343,7 +354,7 @@ class RewardNet(nn.Module):
 
 
 def fit_model(nn_model, X, Y, optimizer, loss_func,
-              batch_size, epochs, max_steps=1e10):
+              batch_size, epochs, max_steps=1e10, noise=0.):
     """
     :param nn_model:        pytorch model of form Y = f(*X) (class)
     :param X:               tuple of necessary inputs to the function
@@ -370,7 +381,10 @@ def fit_model(nn_model, X, Y, optimizer, loss_func,
         num_steps = int(num_samples // batch_size)
         for mb in range(num_steps):
             data_idx = rand_idx[mb*batch_size:(mb+1)*batch_size]
-            batch_X  = [d[data_idx] for d in X]
+            if noise:
+                batch_X = [d[data_idx] + noise * torch.randn_like(d[data_idx]) for d in X]
+            else:
+                batch_X  = [d[data_idx] for d in X]
             batch_Y  = Y[data_idx]
             optimizer.zero_grad()
             Y_hat    = nn_model.forward(*batch_X)

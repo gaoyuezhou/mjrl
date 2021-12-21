@@ -89,7 +89,7 @@ class MLP(torch.nn.Module):
             out = self.nonlinearity(out) # DROPOUT?
         out = self.fc_layers[-1](out) * self.out_scale + self.out_shift
         ### MANUAL CLIP !!!!!
-        out = torch.max(torch.min(out, observations[:,:8]+0.1), observations[:,:8]-0.1)
+        # out = torch.max(torch.min(out, observations[:,:8]+0.1), observations[:,:8]-0.1)
         return out
 
 
