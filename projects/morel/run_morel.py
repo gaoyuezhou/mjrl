@@ -2,6 +2,17 @@
 Job script to learn policy using MOReL
 """
 
+class bcolors:
+    HEADER = '\033[95m'
+    OKBLUE = '\033[94m'
+    OKCYAN = '\033[96m'
+    OKGREEN = '\033[92m'
+    WARNING = '\033[93m'
+    FAIL = '\033[91m'
+    ENDC = '\033[0m'
+    BOLD = '\033[1m'
+    UNDERLINE = '\033[4m'
+
 from os import environ
 environ['CUDA_DEVICE_ORDER']='PCI_BUS_ID'
 environ['MKL_THREADING_LAYER']='GNU'
@@ -118,17 +129,18 @@ if 'obs_mask' in globals(): e.obs_mask = obs_mask
 # Setup policy, model, and agent
 # ===============================================================================
 
-if job_data['model_file'] is not None:
+if job_data['model_file'] is not None and job_data['model_file'] != 'none':
     model_trained = True
     models = pickle.load(open(job_data['model_file'], 'rb'))
     print('Loaded dynamics model')
 else:
+    print(f"{bcolors.FAIL}{bcolors.BOLD}PLZ DONT TRAIN DYNAMICS MODEL ON THE FLY!!{bcolors.ENDC}")
     model_trained = False
     models = [WorldModel(state_dim=e.observation_dim, act_dim=e.action_dim, seed=SEED+i,
                      **job_data) for i in range(job_data['num_models'])]
 
 # Construct policy and set exploration level correctly for NPG
-if 'init_policy' in job_data.keys():
+if 'init_policy' in job_data.keys() and job_data['init_policy']:
     policy = pickle.load(open(job_data['init_policy'], 'rb'))
     policy.set_param_values(policy.get_param_values())
     init_log_std = job_data['init_log_std']
@@ -238,11 +250,21 @@ with open(EXP_FILE, 'w') as f:
 # ===============================================================================
 if 'bc_init' in job_data.keys():
     if isinstance(job_data['bc_init'], str):
-        policy = pickle.load(open(job_data['bc_init'], 'rb'))
+        print(f"{bcolors.OKBLUE}{bcolors.BOLD}Loading pretrained BC {job_data['bc_init']}. {bcolors.ENDC}")
+        pl_policy = pickle.load(open(job_data['bc_init'], 'rb'))
+        policy.set_param_values(pl_policy.get_param_values())
+        policy.to(job_data['device'])
+
     elif job_data['bc_init']:
         from mjrl.algos.behavior_cloning import BC
+        if 'bc_data' in job_data.keys() and job_data['bc_data']:
+            bc_paths = pickle.load(open(job_data['bc_data'], 'rb'))
+        else:
+            bc_paths = paths
+        if job_data['num_iter'] > 0:
+            print(f"{bcolors.FAIL}{bcolors.BOLD}PLZ DONT TRAIN BC MODEL ON THE FLY!!{bcolors.ENDC}")
         policy.to(job_data['device'])
-        bc_agent = BC(paths, policy,
+        bc_agent = BC(bc_paths, policy,
             epochs=80, batch_size=128, loss_type='MSE', save_logs=True, logger=logger,
             set_transforms=True)
         bc_agent.train()
