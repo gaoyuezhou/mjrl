@@ -139,12 +139,13 @@ class BC:
             print('BC val loss', loss_val)
 
     def train(self, **kwargs):
-        observations = np.concatenate([path["observations"] for path in self.expert_paths])
-        expert_actions = np.concatenate([path["actions"] for path in self.expert_paths])
-        observations = tensorize(observations, device=self.policy.device)
-        expert_actions = tensorize(expert_actions, self.policy.device)
-        data = dict(observations=observations, expert_actions=expert_actions)
-        self.fit(data, **kwargs)
+        if not hasattr(self, 'data'):
+            observations = np.concatenate([path["observations"] for path in self.expert_paths])
+            expert_actions = np.concatenate([path["actions"] for path in self.expert_paths])
+            observations = tensorize(observations, device=self.policy.device)
+            expert_actions = tensorize(expert_actions, self.policy.device)
+            self.data = dict(observations=observations, expert_actions=expert_actions)
+        self.fit(self.data, **kwargs)
 
 
 def config_tqdm(range_inp, suppress_tqdm=False):

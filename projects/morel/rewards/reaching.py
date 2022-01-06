@@ -31,7 +31,8 @@ def reward_function(paths):
         tags_xyz = paths["observations"][i, :,-3:]
         tags_xyz = tags_xyz[np.linalg.norm(tags_xyz, axis=1) != 0]
         tag_xyz = np.average((tags_xyz), axis=0)
-        transformed_tag_xyz = coor_transform(tag_xyz)
+        transformed_tag_xyz = tag_xyz                   ### for current auto-collected reaching data, no need to do coordinate transform!!!
+        # transformed_tag_xyz = coor_transform(tag_xyz) ### for current auto-collected reaching data, no need to do coordinate transform!!!
 
         jointstates = paths["observations"][i, :, :8]
         ee_xyz = np.zeros((horizon, 3))
@@ -48,7 +49,6 @@ def reward_function(paths):
 
         #print(i, rewards.shape, distance.shape)
         rewards[i] = 1 - distance
-
     paths["rewards"] = rewards
     return paths
 

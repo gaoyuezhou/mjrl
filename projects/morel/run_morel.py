@@ -216,7 +216,7 @@ logger.log_kv('act_repeat', job_data['act_repeat']) # log action repeat for comp
 # ===============================================================================
 # Pessimistic MDP parameters
 # ===============================================================================
-
+np.set_printoptions(suppress=True, precision=3, threshold=1000)
 delta = np.zeros(s.shape[0])
 for idx_1, model_1 in enumerate(models):
     pred_1 = model_1.predict(s, a)
@@ -225,6 +225,10 @@ for idx_1, model_1 in enumerate(models):
             pred_2 = model_2.predict(s, a)
             disagreement = np.linalg.norm((pred_1-pred_2), axis=-1)
             delta = np.maximum(delta, disagreement)
+            if np.max(disagreement) > 0.05:
+                rn = np.argmax(disagreement)
+                print(s[rn], a[rn], pred_1[rn], pred_2[rn], pred_1[rn] - pred_2[rn])
+# import pdb; pdb.set_trace()
 print(f"Disagreement on given dataset: {delta}")
 
 if 'pessimism_coef' in job_data.keys():
@@ -249,6 +253,8 @@ with open(EXP_FILE, 'w') as f:
 # Behavior Cloning Initialization
 # ===============================================================================
 if 'bc_init' in job_data.keys():
+    if job_data['bc_init'] is not False and job_data['init_policy']:
+        print(f"{bcolors.FAIL}{bcolors.BOLD}Do you want to load policy and load BC at the same time??{bcolors.ENDC}")
     if isinstance(job_data['bc_init'], str):
         print(f"{bcolors.OKBLUE}{bcolors.BOLD}Loading pretrained BC {job_data['bc_init']}. {bcolors.ENDC}")
         pl_policy = pickle.load(open(job_data['bc_init'], 'rb'))
@@ -268,12 +274,26 @@ if 'bc_init' in job_data.keys():
             epochs=80, batch_size=128, loss_type='MSE', save_logs=True, logger=logger,
             set_transforms=True)
         bc_agent.train()
+else:
+
+    from mjrl.algos.behavior_cloning import BC
+    if 'bc_data' in job_data.keys() and job_data['bc_data']:
+        bc_paths = pickle.load(open(job_data['bc_data'], 'rb'))
+    else:
+        bc_paths = paths
+    bc_agent = BC(bc_paths, policy,
+        epochs=1, batch_size=128, loss_type='MSE', save_logs=True, logger=logger,
+        set_transforms=True)
 
 # ===============================================================================
 # Policy Optimization Loop
 # ===============================================================================
 
 for outer_iter in range(job_data['num_iter']):
+
+    if outer_iter and outer_iter % 100 == 0:
+        bc_agent.train()
+
     ts = timer.time()
     agent.to(job_data['device'])
     if job_data['start_state'] == 'init':
