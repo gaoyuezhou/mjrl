@@ -5,18 +5,19 @@
 'env_name'      :   '',
 'act_repeat'    :   1, # ?
 'seed'          :   123,
-'num_iter'      :   10000,
+'num_iter'      :   500,
 'eval_rollouts' :   0, # DON't EVAL --------------------------------------------
 'num_models'    :   4,
-'save_freq'     :   25,
+'save_freq'     :   100,
 'device'        :   'cuda',
 'learn_reward'  :   False,
-'data_file'     :   '/home/franka/dev/franka_learning/morel_12-20-reach-1pos-dirty.pkl',
+'data_file'     :   '/home/franka/dev/franka_learning/morel-avgtag_12-23-clean-rand.pkl',
 'reward_file'   :   'rewards/reaching.py',
-'model_file'    :   'franka-reaching-4-dirty.pickle',
+'model_file'    :   'lift-fix-box-optimal.pickle',
+'bc_data'       :   '/home/franka/dev/franka_learning/morel-avgtag_12-23-clean.pkl',
 'bc_init'       :   True,
-'bc_init_epoch' :   100,
-'pessimism_coef':   0.05,
+'bc_init_epoch' :   80,
+'pessimism_coef':   0.3,
 'truncate_reward' : 0.0,
 'exp_notes'     :   'Example to illustrate MOReL.',
 
@@ -24,18 +25,20 @@
 
 'hidden_size'   :   (128, 128),
 'activation'    :   'relu',
-'fit_lr'        :   5e-4,
+'fit_lr'        :   1e-3,
 'fit_wd'        :   0.0,
 'fit_mb_size'   :   1000,
-'fit_epochs'    :   200,
+'fit_epochs'    :   100,
 'refresh_fit'   :   False,
 'max_steps'     :   1e8,
+'dropout'       :   0.1,
+'noise'         :   0.01,
 
 # NPG params
 
 'policy_size'   :   (128, 128),
 'step_size'     :   0.02, # ?????????
-'init_log_std'  :   -5,
+'init_log_std'  :   -5.0,
 'min_log_std'   :   -10.0,
 'gamma'         :   0.999,
 'gae_lambda'    :   0.97,

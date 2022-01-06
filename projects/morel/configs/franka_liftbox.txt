@@ -5,18 +5,17 @@
 'env_name'      :   '',
 'act_repeat'    :   1, # ?
 'seed'          :   123,
-'num_iter'      :   1,
+'num_iter'      :   400,
 'eval_rollouts' :   0, # DON't EVAL --------------------------------------------
 'num_models'    :   4,
 'save_freq'     :   100,
-#'init_policy'   :  False, #'ktry/iterations/policy_final.pickle',
 'device'        :   'cuda',
 'learn_reward'  :   False,
-'data_file'     :   '/home/franka/dev/franka_learning/morel-avgtag_12-23-clean.pkl',
-'reward_file'   :   'rewards/reaching.py',
-'model_file'    :   'none', #'tmp.pkl',
-'bc_data'       :   '/home/franka/dev/franka_learning/morel-avgtag_12-23-clean.pkl',
-'bc_init'       :  True,
+'data_file'     :   '/home/franka/dev/franka_learning/morel_12-28-all.pkl',
+'reward_file'   :   'rewards/lifting.py',
+'model_file'    :   'lift-fix-box-optimal001.pickle',
+'bc_data'       :   '/home/franka/dev/franka_learning/morel_12-28-all.pkl',
+'init_policy'   :   'lift-fix-box-optimal-bc/iterations/policy_final.pickle',
 'bc_init_epoch' :   80,
 'pessimism_coef':   0.3,
 'truncate_reward' : 0.0,
@@ -33,7 +32,7 @@
 'refresh_fit'   :   False,
 'max_steps'     :   1e8,
 'dropout'       :   0.1,
-'noise'         :   0.01,
+'noise'         :   0.1,
 
 # NPG params
 
