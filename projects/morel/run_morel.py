@@ -99,6 +99,9 @@ torch.random.manual_seed(SEED)
 if ENV_NAME == '':
     from franka import FrankaEnv
     e = FrankaEnv()
+elif ENV_NAME == 'franka-vel':
+    from franka import FrankaVelEnv
+    e = FrankaVelEnv()
 elif ENV_NAME.split('_')[0] == 'dmc':
     # import only if necessary (not part of package requirements)
     import dmc2gym
@@ -140,7 +143,10 @@ else:
                      **job_data) for i in range(job_data['num_models'])]
 
 # Construct policy and set exploration level correctly for NPG
-if 'init_policy' in job_data.keys() and job_data['init_policy']:
+if job_data['num_iter'] > 0:
+    print(f"{bcolors.OKBLUE}Loading pretrained policy{bcolors.ENDC}")
+    assert('init_policy' in job_data.keys() and job_data['init_policy'],
+        "Please specify a initial policy")
     policy = pickle.load(open(job_data['init_policy'], 'rb'))
     policy.set_param_values(policy.get_param_values())
     init_log_std = job_data['init_log_std']
@@ -191,6 +197,32 @@ try:
     logger.log_kv('rollout_metric', rollout_metric)
 except:
     pass
+
+
+
+if job_data['num_iter'] == 0: # NOT RUNNING MOREL
+
+    print(f"{bcolors.OKBLUE}Training BC{bcolors.ENDC}")
+
+    #elif job_data['bc_init']:
+    from mjrl.algos.behavior_cloning import BC
+    if 'bc_data' in job_data.keys() and job_data['bc_data']:
+        bc_paths = pickle.load(open(job_data['bc_data'], 'rb'))
+    else:
+        bc_paths = paths
+    policy.to(job_data['device'])
+    bc_agent = BC(bc_paths, policy,
+        epochs=job_data['bc_init_epoch'], batch_size=128, loss_type='MSE', save_logs=True, logger=logger,
+        set_transforms=True)
+    bc_agent.train()
+
+    pickle.dump(agent, open(OUT_DIR + '/iterations/agent_final.pickle', 'wb'))
+    pickle.dump(policy, open(OUT_DIR + '/iterations/policy_final.pickle', 'wb'))
+
+    exit(0)
+
+
+# DYNAMICS MODEL
 if not model_trained:
     for i, model in enumerate(models):
         dynamics_loss = model.fit_dynamics(s, a, sp, **job_data)
@@ -202,8 +234,8 @@ if not model_trained:
             logger.log_kv('rew_loss_' + str(i), reward_loss[-1])
 else:
     for i, model in enumerate(models):
-        loss_general = model.compute_loss(s, a, sp)
-        logger.log_kv('dyn_loss_gen_' + str(i), loss_general)
+       loss_general = model.compute_loss(s, a, sp)
+       logger.log_kv('dyn_loss_gen_' + str(i), loss_general)
 tf = timer.time()
 logger.log_kv('model_learning_time', tf-ts)
 print("Model learning statistics")
@@ -228,7 +260,6 @@ for idx_1, model_1 in enumerate(models):
             if np.max(disagreement) > 0.05:
                 rn = np.argmax(disagreement)
                 print(s[rn], a[rn], pred_1[rn], pred_2[rn], pred_1[rn] - pred_2[rn])
-# import pdb; pdb.set_trace()
 print(f"Disagreement on given dataset: {delta}")
 
 if 'pessimism_coef' in job_data.keys():
@@ -252,38 +283,15 @@ with open(EXP_FILE, 'w') as f:
 # ===============================================================================
 # Behavior Cloning Initialization
 # ===============================================================================
-if 'bc_init' in job_data.keys():
-    if job_data['bc_init'] is not False and job_data['init_policy']:
-        print(f"{bcolors.FAIL}{bcolors.BOLD}Do you want to load policy and load BC at the same time??{bcolors.ENDC}")
-    if isinstance(job_data['bc_init'], str):
-        print(f"{bcolors.OKBLUE}{bcolors.BOLD}Loading pretrained BC {job_data['bc_init']}. {bcolors.ENDC}")
-        pl_policy = pickle.load(open(job_data['bc_init'], 'rb'))
-        policy.set_param_values(pl_policy.get_param_values())
-        policy.to(job_data['device'])
 
-    elif job_data['bc_init']:
-        from mjrl.algos.behavior_cloning import BC
-        if 'bc_data' in job_data.keys() and job_data['bc_data']:
-            bc_paths = pickle.load(open(job_data['bc_data'], 'rb'))
-        else:
-            bc_paths = paths
-        if job_data['num_iter'] > 0:
-            print(f"{bcolors.FAIL}{bcolors.BOLD}PLZ DONT TRAIN BC MODEL ON THE FLY!!{bcolors.ENDC}")
-        policy.to(job_data['device'])
-        bc_agent = BC(bc_paths, policy,
-            epochs=80, batch_size=128, loss_type='MSE', save_logs=True, logger=logger,
-            set_transforms=True)
-        bc_agent.train()
+from mjrl.algos.behavior_cloning import BC
+if 'bc_data' in job_data.keys() and job_data['bc_data']:
+    bc_paths = pickle.load(open(job_data['bc_data'], 'rb'))
 else:
-
-    from mjrl.algos.behavior_cloning import BC
-    if 'bc_data' in job_data.keys() and job_data['bc_data']:
-        bc_paths = pickle.load(open(job_data['bc_data'], 'rb'))
-    else:
-        bc_paths = paths
-    bc_agent = BC(bc_paths, policy,
-        epochs=1, batch_size=128, loss_type='MSE', save_logs=True, logger=logger,
-        set_transforms=True)
+    bc_paths = paths
+bc_agent = BC(bc_paths, policy,
+    epochs=1, batch_size=128, loss_type='MSE', save_logs=True, logger=logger,
+    set_transforms=True)
 
 # ===============================================================================
 # Policy Optimization Loop
@@ -291,7 +299,7 @@ else:
 
 for outer_iter in range(job_data['num_iter']):
 
-    if outer_iter and outer_iter % 100 == 0:
+    if outer_iter and outer_iter % 100 == 0: # CONSIDER REMOVAL
         bc_agent.train()
 
     ts = timer.time()

@@ -90,7 +90,7 @@ class WorldModel:
         return loss.to('cpu').data.numpy()
 
     def fit_dynamics(self, s, a, sp, fit_mb_size, fit_epochs, max_steps=1e4,
-                     set_transformations=True, noise=0, *args, **kwargs):
+                     set_transformations=True, *args, **kwargs):
         # move data to correct devices
         assert type(s) == type(a) == type(sp)
         assert s.shape[0] == a.shape[0] == sp.shape[0]

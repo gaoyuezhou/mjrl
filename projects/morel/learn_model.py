@@ -95,3 +95,33 @@ for i, model in enumerate(models):
         reward_loss = model.fit_reward(s, a, r.reshape(-1, 1), **job_data)
 
 pickle.dump(models, open(output_fn, 'wb'))
+
+# GENERAL LOSS
+
+from mjrl.utils.logger import DataLog
+logger = DataLog()
+
+for i, model in enumerate(models):
+    loss_general = model.compute_loss(s, a, sp)
+        logger.log_kv('dyn_loss_gen_' + str(i), loss_general)
+
+print_data = sorted(filter(lambda v: np.asarray(v[1]).size == 1,
+                            logger.get_current_log().items()))
+print(tabulate(print_data))
+
+# DISAGREEMENT
+
+np.set_printoptions(suppress=True, precision=3, threshold=1000)
+delta = np.zeros(s.shape[0])
+for idx_1, model_1 in enumerate(models):
+    pred_1 = model_1.predict(s, a)
+    for idx_2, model_2 in enumerate(models):
+        if idx_2 > idx_1:
+            pred_2 = model_2.predict(s, a)
+            disagreement = np.linalg.norm((pred_1-pred_2), axis=-1)
+            delta = np.maximum(delta, disagreement)
+            if np.max(disagreement) > 0.05:
+                rn = np.argmax(disagreement)
+                print(s[rn], a[rn], pred_1[rn], pred_2[rn], pred_1[rn] - pred_2[rn])
+# import pdb; pdb.set_trace()
+print(f"Disagreement on given dataset: {delta}")
