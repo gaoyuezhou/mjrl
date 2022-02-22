@@ -1,0 +1,50 @@
+{
+
+# general inputs
+
+'env_name'      :   '',
+'act_repeat'    :   1, # ?
+'seed'          :   123,
+'num_iter'      :   300,
+'eval_rollouts' :   0, # DON't EVAL --------------------------------------------
+'num_models'    :   4,
+'save_freq'     :   25,
+'device'        :   'cuda',
+'learn_reward'  :   False,
+'data_file'     :   '/home/franka/dev/franka_learning/parsed_datasets/morel_lifting-lid-vel-half-cleaned.pkl',
+'reward_file'   :   'rewards/lifting_lid.py',
+'model_file'    :   'experiments/lifting-lid-vel-half-cleaned.pickle',
+'bc_data'       :   '/home/franka/dev/franka_learning/parsed_datasets/morel_lifting-lid-vel-half-cleaned.pkl',
+'init_policy'   :   'experiments/lifting-lid-vel-half-cleaned-bc/iterations/policy_final.pickle',
+'bc_init_epoch' :   40,
+'pessimism_coef':   0.3,
+'truncate_reward' : 0.0,
+'exp_notes'     :   'Example to illustrate MOReL.',
+
+# dynamics learning
+
+'hidden_size'   :   (128, 128),
+'activation'    :   'relu',
+'fit_lr'        :   1e-3,
+'fit_wd'        :   0.0,
+'fit_mb_size'   :   1000,
+'fit_epochs'    :   100,
+'refresh_fit'   :   False,
+'max_steps'     :   1e8,
+'dropout'       :   0.1,
+'noise'         :   0.001,
+
+# NPG params
+
+'policy_size'   :   (128, 128),
+'step_size'     :   0.02, # ?????????
+'init_log_std'  :   -5.0,
+'min_log_std'   :   -10.0,
+'gamma'         :   0.999,
+'gae_lambda'    :   0.97,
+'update_paths'  :   20,
+'start_state'   :   'init',
+'horizon'       :   400,
+'npg_hp'        :   dict(FIM_invert_args={'iters': 25, 'damping': 1e-3}),
+
+}
