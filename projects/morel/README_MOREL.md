@@ -1,6 +1,6 @@
 # MOReL Pipeline
 
-For the pushing lid task
+For the pushing lid task. Checkout the `debug` branch for the most recent code.
 
 ## Dataset Download
 Download the pushing lid dataset from [Google Drive](https://drive.google.com/drive/folders/1GPmEGEUkOtGkLHl7yaFjMiyZaPaupjky?usp=sharing)
