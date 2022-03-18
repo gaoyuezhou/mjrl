@@ -3,7 +3,7 @@
 For the pushing lid task. Checkout the `debug` branch for the most recent code.
 
 ## Dataset Download
-Download the pushing lid dataset from [Google Drive](https://drive.google.com/drive/folders/1mXksO1pD6hdybkSuUADhG2sKo1QOOb-L)
+Download the pushing lid dataset from [Google Drive (under pushing-lid-datasets)](https://drive.google.com/drive/folders/1mXksO1pD6hdybkSuUADhG2sKo1QOOb-L)
 
 All datasets have the same format. When loaded, each dataset is a list of dictionaries with the following keys:
 
