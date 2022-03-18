@@ -96,9 +96,13 @@ def buffer_size(paths_list):
 np.random.seed(SEED)
 torch.random.manual_seed(SEED)
 
+paths = pickle.load(open(job_data['data_file'], 'rb'))
+
 if ENV_NAME == '':
     from franka import FrankaEnv
-    e = FrankaEnv()
+    # e = FrankaEnv()
+    # mean_horizon = int(np.mean([paths[i]['observations'].shape[0] for i in range(len(paths))]))
+    e = FrankaEnv(obs_dim=paths[0]['observations'].shape[1], horizon = job_data['horizon'])
 elif ENV_NAME == 'franka-vel':
     from franka import FrankaVelEnv
     e = FrankaVelEnv()
@@ -145,8 +149,7 @@ else:
 # Construct policy and set exploration level correctly for NPG
 if job_data['num_iter'] > 0:
     print(f"{bcolors.OKBLUE}Loading pretrained policy{bcolors.ENDC}")
-    assert('init_policy' in job_data.keys() and job_data['init_policy'],
-        "Please specify a initial policy")
+    assert 'init_policy' in job_data.keys() and job_data['init_policy'], "Please specify a initial policy"
     policy = pickle.load(open(job_data['init_policy'], 'rb'))
     policy.set_param_values(policy.get_param_values())
     init_log_std = job_data['init_log_std']
@@ -178,9 +181,10 @@ agent = ModelBasedNPG(learned_model=models, env=e, policy=policy, baseline=basel
 # Model training loop
 # ===============================================================================
 
-paths = pickle.load(open(job_data['data_file'], 'rb'))
+# paths = pickle.load(open(job_data['data_file'], 'rb'))
 init_states_buffer = [p['observations'][0] for p in paths]
 best_perf = -1e8
+best_epoch = None
 ts = timer.time()
 s = np.concatenate([p['observations'][:-1] for p in paths])
 a = np.concatenate([p['actions'][:-1] for p in paths])
@@ -298,9 +302,10 @@ bc_agent = BC(bc_paths, policy,
 # ===============================================================================
 
 for outer_iter in range(job_data['num_iter']):
+    logger.log_kv('epoch', outer_iter)
 
-    if outer_iter and outer_iter % 100 == 0: # CONSIDER REMOVAL
-        bc_agent.train()
+    # if outer_iter and outer_iter % 10 == 0: # CONSIDER REMOVAL
+    #     bc_agent.train()
 
     ts = timer.time()
     agent.to(job_data['device'])
@@ -322,7 +327,7 @@ for outer_iter in range(job_data['num_iter']):
         init_states_2 = list(s[buffer_rand_idx])
         init_states = init_states_1 + init_states_2
 
-    train_stats = agent.train_step(N=len(init_states), init_states=init_states, **job_data)
+    train_stats = agent.train_step(N=len(init_states), init_states=init_states, epoch=outer_iter, **job_data)
     logger.log_kv('train_score', train_stats[0])
     agent.policy.to('cpu')
 
@@ -347,6 +352,7 @@ for outer_iter in range(job_data['num_iter']):
     if policy_score > best_perf:
         best_policy = copy.deepcopy(policy) # safe as policy network is clamped to CPU
         best_perf = policy_score
+        best_epoch = outer_iter
 
     tf = timer.time()
     logger.log_kv('iter_time', tf-ts)
@@ -376,4 +382,5 @@ for outer_iter in range(job_data['num_iter']):
 pickle.dump(agent, open(OUT_DIR + '/iterations/agent_final.pickle', 'wb'))
 #policy.set_transformations(in_scale = 1.0 / e.obs_mask)
 pickle.dump(policy, open(OUT_DIR + '/iterations/policy_final.pickle', 'wb'))
+print("epoch of best policy: ", best_epoch)
 

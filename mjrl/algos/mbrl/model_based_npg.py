@@ -70,6 +70,7 @@ class ModelBasedNPG(NPG):
                    termination_function=None,
                    truncate_lim=None,
                    truncate_reward=0.0,
+                   epoch=1,
                    **kwargs,
                    ):
 
@@ -179,6 +180,35 @@ class ModelBasedNPG(NPG):
             self.logger.log_kv('time_sampling', timer.time() - ts)
 
         self.seed = self.seed + N if self.seed is not None else self.seed
+
+        ##################### for plotting states & reward for rollout trajs #####################
+        # import matplotlib.pyplot as plt
+        # if len(paths) > 0:
+        #     plt.plot(paths[0]['goal_dist'], label="lid to goal")
+        #     plt.plot(paths[0]['gripper_dist'], label="gripper to lid")
+        #     plt.plot(paths[0]['observations'][:, 7], label="gripper action")
+        #     plt.plot(paths[0]['rewards'], label="reward: 1 - (gripper_dist*2 + goal_dist)")
+        #     plt.legend(loc="upper left")
+        #     plt.savefig("/home/franka/Desktop/plots/tst-rewards/epoch_{}".format(epoch))
+        #     plt.title("Rewards for path[0] at epoch_{}".format(epoch))
+        #     plt.close()
+
+
+        #     fig, axs = plt.subplots(3, 7, figsize=(21, 9))
+
+        #     count = 0
+        #     for i in range(3):
+        #         for j in range(7):
+        #             axs[i, j].plot(paths[0]['observations'][:, count], label="state[{}]".format(count))
+        #             axs[i, j].set_title("state[{}]".format(count))
+        #             count += 1
+        #             # axs[i, j].title("States for expert_{}".format(i))
+        #     fig.savefig("/home/franka/Desktop/plots/tst/epoch_{}".format(epoch))
+        #     for i in range(3):
+        #         for j in range(7):
+        #             axs[i, j].clear()
+        #     plt.close()
+        ##################################################################################
 
         # compute returns
         process_samples.compute_returns(paths, gamma)

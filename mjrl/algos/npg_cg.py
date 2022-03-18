@@ -142,6 +142,7 @@ class NPG(BatchREINFORCE):
             self.logger.log_kv('kl_dist', kl_divergence)
             self.logger.log_kv('surr_improvement', surr_after - surr_before)
             self.logger.log_kv('running_score', self.running_score)
+            self.logger.log_kv('avg_max_rewards', base_stats[-1])
             try:
                 self.env.env.env.evaluate_success(paths, self.logger)
             except:

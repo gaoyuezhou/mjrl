@@ -190,11 +190,12 @@ class BatchREINFORCE:
 
         # cache return distributions for the paths
         path_returns = [sum(p["rewards"]) for p in paths]
+        avg_max_rewards = np.mean([max(p["rewards"]) for p in paths])
         mean_return = np.mean(path_returns)
         std_return = np.std(path_returns)
         min_return = np.amin(path_returns)
         max_return = np.amax(path_returns)
-        base_stats = [mean_return, std_return, min_return, max_return]
+        base_stats = [mean_return, std_return, min_return, max_return, avg_max_rewards]
         running_score = mean_return if self.running_score is None else \
                         0.9 * self.running_score + 0.1 * mean_return
 

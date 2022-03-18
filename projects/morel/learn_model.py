@@ -50,12 +50,15 @@ SEED = job_data['seed']
 del(job_data['seed'])
 if 'act_repeat' not in job_data.keys(): job_data['act_repeat'] = 1
 
+paths = pickle.load(open(job_data['data_file'], 'rb'))
 # ===============================================================================
 # Construct environment and model
 # ===============================================================================
 if ENV_NAME == '':
     from franka import FrankaEnv
-    e = FrankaEnv()
+    # mean_horizon = int(np.mean([paths[i]['observations'].shape[0] for i in range(len(paths))]))
+    # e = FrankaEnv(obs_dim=paths[0]['observations'].shape[1], horizon=mean_horizon)
+    e = FrankaEnv(obs_dim=paths[0]['observations'].shape[1], horizon =job_data['horizon'])
 elif ENV_NAME.split('_')[0] == 'dmc':
     # import only if necessary (not part of package requirements)
     import dmc2gym
@@ -73,7 +76,7 @@ models = [WorldModel(state_dim=e.observation_dim, act_dim=e.action_dim, seed=SEE
 # Model training loop
 # ===============================================================================
 
-paths = pickle.load(open(job_data['data_file'], 'rb'))
+# paths = pickle.load(open(job_data['data_file'], 'rb'))
 init_states_buffer = [p['observations'][0] for p in paths]
 best_perf = -1e8
 ts = timer.time()
@@ -81,7 +84,7 @@ s = np.concatenate([p['observations'][:-1] for p in paths])
 a = np.concatenate([p['actions'][:-1] for p in paths])
 sp = np.concatenate([p['observations'][1:] for p in paths])
 r = np.concatenate([p['rewards'][:-1] for p in paths])
-rollout_score = np.mean([np.sum(p['rewards']) for p in paths])
+rollout_score = np.mean([np.sum(p['rewards']) for p in paths])  ### avg of sum of rewards (recorded) of a traj in the expert demos
 num_samples = np.sum([p['rewards'].shape[0] for p in paths])
 
 print('Observation shape', np.asarray(paths[0]['observations'][0]).shape)
@@ -103,7 +106,7 @@ logger = DataLog()
 
 for i, model in enumerate(models):
     loss_general = model.compute_loss(s, a, sp)
-        logger.log_kv('dyn_loss_gen_' + str(i), loss_general)
+    logger.log_kv('dyn_loss_gen_' + str(i), loss_general)
 
 print_data = sorted(filter(lambda v: np.asarray(v[1]).size == 1,
                             logger.get_current_log().items()))
@@ -125,3 +128,5 @@ for idx_1, model_1 in enumerate(models):
                 print(s[rn], a[rn], pred_1[rn], pred_2[rn], pred_1[rn] - pred_2[rn])
 # import pdb; pdb.set_trace()
 print(f"Disagreement on given dataset: {delta}")
+
+
