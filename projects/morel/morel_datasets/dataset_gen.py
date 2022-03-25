@@ -36,7 +36,7 @@ replayed_paths = []
 for p in range(len(train_paths)): # only add noise to states (including goals)! delta actions are computed based on the noisy states at the next step
     for i in range(num_replay):
         cur_replay_path = train_paths[p].copy()
-        cur_replay_path['observations'] += np.random.uniform(low=0, high=0.001, size=train_paths[p]['observations'].shape)
+        cur_replay_path['observations'] += np.random.standard_normal(size=train_paths[p]['observations'].shape) * 0.0001
         replayed_paths.append(cur_replay_path)
 train_paths.extend(replayed_paths)
 for p in range(len(train_paths)):
