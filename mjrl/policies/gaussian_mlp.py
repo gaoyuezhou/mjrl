@@ -83,11 +83,11 @@ class MLP(torch.nn.Module):
         if type(observations) == np.ndarray: observations = torch.from_numpy(observations).float()
         assert type(observations) == torch.Tensor
         observations = observations.to(self.device)
-        out = (observations - self.in_shift) / (self.in_scale + 1e-6)
+        out = (observations - self.in_shift) / (self.in_scale + 1e-8)
         for i in range(len(self.fc_layers)-1):
             out = self.fc_layers[i](out)
             out = self.nonlinearity(out) # DROPOUT?
-        out = self.fc_layers[-1](out) * self.out_scale + self.out_shift
+        out = self.fc_layers[-1](out) * (self.out_scale + 1e-8) + self.out_shift
         ### MANUAL CLIP !!!!!
         # out = torch.max(torch.min(out, observations[:,:8]+0.1), observations[:,:8]-0.1)
         return out

@@ -74,7 +74,10 @@ def policy_rollout(
         # in the policy class to make this more generally applicable.
         at = policy.forward(st)
         if eval_mode is not True:
-            at = at + torch.randn(at.shape).to(policy.device) * torch.exp(policy.log_std)
+            # at = at + torch.randn(at.shape).to(policy.device) * torch.exp(policy.log_std)
+            at = at + torch.randn(at.shape).to(policy.device) * torch.exp(policy.log_std) * policy.out_scale
+            # import pdb; pdb.set_trace()
+            # NOTE: scale out_scale right now TODO
         # clamp states and actions to avoid blowup
         at = enforce_tensor_bounds(at, a_min, a_max, large_value)
         stp1 = learned_model.forward(st, at)
