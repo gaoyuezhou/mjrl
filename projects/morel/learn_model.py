@@ -29,6 +29,8 @@ from mjrl.algos.mbrl.nn_dynamics import WorldModel
 from mjrl.algos.mbrl.model_based_npg import ModelBasedNPG
 from mjrl.algos.mbrl.sampling import sample_paths, evaluate_policy
 
+from misc import parse_overrides
+
 # ===============================================================================
 # Get command line arguments
 # ===============================================================================
@@ -37,10 +39,15 @@ parser = argparse.ArgumentParser(description='Model accelerated policy optimizat
 parser.add_argument('--output', '-o', type=str, required=False, help='location to store the model pickle file')
 parser.add_argument('--config', '-c', type=str, required=True, help='path to config file with exp params')
 parser.add_argument('--include', '-i', type=str, required=False, help='package to import')
-args = parser.parse_args()
+args, overrides = parser.parse_known_args()
 with open(args.config, 'r') as f:
     job_data = eval(f.read())
+    print('Overriding parameters', overrides)
+    job_data = parse_overrides(job_data, overrides)
+
 if args.include: exec("import "+args.include)
+
+print(job_data)
 
 output_fn = args.output or job_data['model_file']
 

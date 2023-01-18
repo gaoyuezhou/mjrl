@@ -25,10 +25,11 @@ class FrankaEnv(GymEnv):
     obs_mask = np.array([1.0, 1.0, 1.0,  1.0, 1.0, 1.0,  1.0, 1.0, 1.0,  1.0, 1.0])
 
 
-    def __init__(self, obs_dim=11, horizon=500):
+    def __init__(self, obs_dim=11, action_dim=8, horizon=500):
         self.observation_dim = obs_dim
+        self.action_dim = action_dim
         self.horizon = horizon
-        self.spec = FrankaSpec(obs_dim=obs_dim)
+        self.spec = FrankaSpec(obs_dim=obs_dim, action_dim=action_dim)
         # pass
 
     def reset(self):

@@ -173,6 +173,7 @@ class ModelBasedNPG(NPG):
                 path["rewards"] = path["rewards"][:T]
                 if truncated: path["rewards"][-1] += truncate_reward
                 path["terminated"] = path["terminated"] if T == path['observations'].shape[0] else True
+                # path["terminated"] = False if T == path['observations'].shape[0] else True
 
 
         self.logger.log_kv('traj_len_3cut', np.average([len(p['rewards']) for p in paths]))

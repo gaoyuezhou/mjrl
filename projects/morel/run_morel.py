@@ -40,6 +40,8 @@ from mjrl.algos.mbrl.nn_dynamics import WorldModel
 from mjrl.algos.mbrl.model_based_npg import ModelBasedNPG
 from mjrl.algos.mbrl.sampling import sample_paths, evaluate_policy
 
+from misc import parse_overrides
+
 # ===============================================================================
 # Get command line arguments
 # ===============================================================================
@@ -48,13 +50,16 @@ parser = argparse.ArgumentParser(description='Model accelerated policy optimizat
 parser.add_argument('--output', '-o', type=str, required=True, help='location to store results')
 parser.add_argument('--config', '-c', type=str, required=True, help='path to config file with exp params')
 parser.add_argument('--include', '-i', type=str, required=False, help='package to import')
-args = parser.parse_args()
+args, overrides = parser.parse_known_args()
+
 OUT_DIR = args.output
 if not os.path.exists(OUT_DIR): os.mkdir(OUT_DIR)
 if not os.path.exists(OUT_DIR+'/iterations'): os.mkdir(OUT_DIR+'/iterations')
 if not os.path.exists(OUT_DIR+'/logs'): os.mkdir(OUT_DIR+'/logs')
 with open(args.config, 'r') as f:
     job_data = eval(f.read())
+    print('Overriding parameters', overrides)
+    job_data = parse_overrides(job_data, overrides)
 if args.include: exec("import "+args.include)
 
 # Unpack args and make files for easy access
@@ -149,18 +154,29 @@ else:
 # Construct policy and set exploration level correctly for NPG
 if job_data['num_iter'] > 0:
     print(f"{bcolors.OKBLUE}Loading pretrained policy{bcolors.ENDC}")
-    assert 'init_policy' in job_data.keys() and job_data['init_policy'], "Please specify a initial policy"
-    policy = pickle.load(open(job_data['init_policy'], 'rb'))
-    policy.set_param_values(policy.get_param_values())
-    init_log_std = job_data['init_log_std']
-    min_log_std = job_data['min_log_std']
-    if init_log_std:
-        params = policy.get_param_values()
-        params[:policy.action_dim] = tensor_utils.tensorize(init_log_std)
-        policy.set_param_values(params)
-    if min_log_std:
-        policy.min_log_std[:] = tensor_utils.tensorize(min_log_std)
+    # assert 'init_policy' in job_data.keys() and job_data['init_policy'], "Please specify a initial policy"
+    if 'init_policy' in job_data.keys() and job_data['init_policy']:
+        policy = pickle.load(open(job_data['init_policy'], 'rb'))
         policy.set_param_values(policy.get_param_values())
+
+        print("Loaded policy has transformation:")
+        print(f" in shift\n  {policy.in_shift}\n in scale\n  {policy.in_scale}")
+        print(f" out shift\n   {policy.out_shift}\n out scale\n  {policy.out_scale}")
+
+        init_log_std = job_data['init_log_std']
+        min_log_std = job_data['min_log_std']
+        if init_log_std:
+            params = policy.get_param_values()
+            params[:policy.action_dim] = tensor_utils.tensorize(init_log_std)
+            policy.set_param_values(params)
+        if min_log_std:
+            policy.min_log_std[:] = tensor_utils.tensorize(min_log_std)
+            policy.set_param_values(policy.get_param_values())
+    else:
+        policy = MLP(e.spec, seed=SEED, hidden_sizes=job_data['policy_size'], 
+                    init_log_std=job_data['init_log_std'], min_log_std=job_data['min_log_std'])
+
+
 else:
     print(f'Policy obs dim {e.observation_dim} act dim {e.action_dim}')
     policy = MLP(e.spec, seed=SEED, hidden_sizes=job_data['policy_size'],
@@ -295,7 +311,15 @@ else:
     bc_paths = paths
 bc_agent = BC(bc_paths, policy,
     epochs=1, batch_size=128, loss_type='MSE', save_logs=True, logger=logger,
-    set_transforms=True)
+    set_transforms=False) ## DON't set transformation here
+
+
+print("\n\n\nBefore entering RL, policy has transformation:")
+print(f" in shift\n  {policy.in_shift}\n in scale\n  {policy.in_scale}")
+print(f" out shift\n   {policy.out_shift}\n out scale\n  {policy.out_scale}")
+print("-" * 20)
+
+# TODO! Ensure transformation consistent between pretrained BC and init policy.
 
 # ===============================================================================
 # Policy Optimization Loop
@@ -304,8 +328,8 @@ bc_agent = BC(bc_paths, policy,
 for outer_iter in range(job_data['num_iter']):
     logger.log_kv('epoch', outer_iter)
 
-    # if outer_iter and outer_iter % 10 == 0: # CONSIDER REMOVAL
-    #     bc_agent.train()
+    if outer_iter and outer_iter % 10 == 0: # CONSIDER REMOVAL
+        bc_agent.train()
 
     ts = timer.time()
     agent.to(job_data['device'])
@@ -382,5 +406,5 @@ for outer_iter in range(job_data['num_iter']):
 pickle.dump(agent, open(OUT_DIR + '/iterations/agent_final.pickle', 'wb'))
 #policy.set_transformations(in_scale = 1.0 / e.obs_mask)
 pickle.dump(policy, open(OUT_DIR + '/iterations/policy_final.pickle', 'wb'))
-print("epoch of best policy: ", best_epoch)
+print("epoch of best policy: ", best_epoch, " rollout score: ", best_perf, " dataset rollout_score: ", rollout_score)
 
